@@ -166,3 +166,30 @@ def original(request, pk):
     response["Content-Disposition"] = 'inline; filename="purchase-order.pdf"'
     response["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'self'"
     return response
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def delete_draft(request, pk):
+    if CREATOR not in roles_for(request.user):
+        return HttpResponse("Permission denied.", status=403)
+    context = {"pk": pk}
+    try:
+        with transaction.atomic():
+            orders = PurchaseOrder.objects.filter(creator=request.user)
+            if request.method == "POST":
+                orders = orders.select_for_update()
+            order = get_object_or_404(orders, pk=pk)
+            if order.status != PurchaseOrder.Status.DRAFT or order.history.exists():
+                return HttpResponse("Only an unsubmitted draft can be deleted.", status=409)
+            context["number"] = order.number
+            if request.method == "POST":
+                key = order.pdf_key
+                order.delete()
+                if key:
+                    storage.delete_original(key)
+                return redirect("workspace")
+    except storage.StorageUnavailable:
+        context["error"] = "PDF storage could not confirm deletion. The draft was retained. Please retry."
+        return render(request, "orders/delete.html", context, status=503)
+    return render(request, "orders/delete.html", context)

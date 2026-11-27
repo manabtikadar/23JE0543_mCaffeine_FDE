@@ -1,0 +1,12 @@
+{% extends "orders/base.html" %}
+{% block title %}Delete draft{% endblock %}
+{% block content %}
+<h1>Delete {{ number|default:"unnumbered draft" }}?</h1>
+<p>This permanently deletes the draft, its line items and any attached PDF.</p>
+{% if error %}<p class="errorlist" role="alert">{{ error }}</p>{% endif %}
+<form method="post">
+  {% csrf_token %}
+  <a href="{% url 'draft-detail' pk %}">Keep draft</a>
+  <button type="submit">Permanently delete draft</button>
+</form>
+{% endblock %}

@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import PurchaseOrder
+from .storage import StorageUnavailable
 
 
 class PageInputs(HTMLParser):
@@ -106,6 +107,41 @@ class ManualDraftTests(TestCase):
     def test_normalized_uniqueness_applies_to_database_writes(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
             PurchaseOrder.objects.create(number=" po-1 ", creator=self.other)
+
+    @patch("orders.storage.storage_request")
+    def test_confirm_delete_and_reuse_number(self, storage_request):
+        self.order.pdf_key = "originals/test.pdf"
+        self.order.save()
+        item = self.order.items.create(sku="A", description="Test", quantity=1, unit_price=100, line_total=100)
+        url = reverse("delete-draft", args=[self.order.pk])
+        self.assertContains(self.client.get(url), "Keep draft")
+        storage_request.assert_not_called()
+        storage_request.side_effect = StorageUnavailable()
+        self.assertContains(self.client.post(url), "Please retry", status_code=503)
+        self.assertTrue(self.order.items.filter(pk=item.pk).exists())
+        self.order.refresh_from_db()
+        storage_request.side_effect = None
+        self.assertRedirects(self.client.post(url), reverse("workspace"))
+        storage_request.assert_called_with("object/po-originals", "DELETE", b'{"prefixes": ["originals/test.pdf"]}')
+        self.assertFalse(type(item).objects.filter(pk=item.pk).exists())
+        self.assertEqual(self.client.get(url).status_code, 404)
+        PurchaseOrder.objects.create(number=self.order.number, creator=self.owner)
+
+    @patch("orders.storage.delete_original")
+    def test_delete_requires_creator_ownership_and_draft_status(self, delete_original):
+        url = reverse("delete-draft", args=[self.order.pk])
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.post(url).status_code, 404)
+        self.client.force_login(self.owner)
+        for status in ("REJECTED", "SUBMITTED", "APPROVED"):
+            self.order.status = status
+            self.order.save()
+            self.assertEqual(self.client.post(url).status_code, 409)
+        self.order.status = "DRAFT"
+        self.order.save()
+        self.owner.groups.clear()
+        self.assertEqual(self.client.post(url).status_code, 403)
+        delete_original.assert_not_called()
 
     @patch("orders.storage.check_bucket")
     @patch("orders.storage.storage_request")

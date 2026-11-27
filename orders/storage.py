@@ -28,3 +28,7 @@ def storage_request(path, method="GET", data=None, content_type="application/jso
 def check_bucket():
     if json.loads(storage_request("bucket/po-originals")).get("public") is not False:
         raise StorageUnavailable("Originals require a private bucket.")
+
+
+def delete_original(key):
+    storage_request("object/po-originals", "DELETE", json.dumps({"prefixes": [key]}).encode())

@@ -8,6 +8,7 @@ from orders.models import HistoryEntry
 from . import views
 
 urlpatterns = [
+    path("pos/<int:pk>/delete/", drafts.delete_draft, name="delete-draft"),
     path("pos/<int:pk>/read-items/", orders.read_original_items, name="read-original-items"),
     path("api/pos/<int:pk>/approve/", orders.decide, {"action": HistoryEntry.Action.APPROVE}, name="approve"),
     path("api/pos/<int:pk>/reject/", orders.decide, {"action": HistoryEntry.Action.REJECT}, name="reject"),

@@ -85,4 +85,5 @@ document.querySelector("#add").onclick = () => {
 <ol>{% for entry in history %}
   <li>{{ entry.recorded_at|date:"Y-m-d H:i:s T" }} · {{ entry.actor.username }} · {{ entry.get_action_display }}{% if entry.remark %} — {{ entry.remark }}{% endif %}</li>
 {% empty %}<li>No actions recorded.</li>{% endfor %}</ol>
+{% if editable and order.status == "DRAFT" %}<p><a href="{% url 'delete-draft' order.pk %}">Delete draft</a></p>{% endif %}
 {% endblock %}
