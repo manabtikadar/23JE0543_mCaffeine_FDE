@@ -10,8 +10,8 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_safe
 
 from . import storage
-from .access import CREATOR, roles_for, visible_orders
-from .models import LineItem, PurchaseOrder
+from .access import APPROVER, CREATOR, roles_for, visible_orders
+from .models import HistoryEntry, LineItem, PurchaseOrder
 
 
 class HeaderForm(forms.ModelForm):
@@ -78,7 +78,9 @@ def detail(request, pk):
             if request.method == "POST":
                 orders = orders.select_for_update()
             order = get_object_or_404(orders, pk=pk)
-            editable = CREATOR in roles and order.creator_id == request.user.pk and order.status == "DRAFT"
+            editable = CREATOR in roles and order.creator_id == request.user.pk and order.status in (
+                PurchaseOrder.Status.DRAFT, PurchaseOrder.Status.REJECTED
+            )
             if request.method == "POST" and not editable:
                 return HttpResponse("Permission denied.", status=403)
             data = request.POST if request.method == "POST" else None
@@ -95,6 +97,8 @@ def detail(request, pk):
                     storage.storage_request("object/po-originals/" + key, "POST", file.read(), "application/pdf")
                     saved_key = order.pdf_key = key
                 if submitting:
+                    action = HistoryEntry.Action.RESUBMIT if order.status == PurchaseOrder.Status.REJECTED else HistoryEntry.Action.SUBMIT
+                    HistoryEntry.objects.create(order=order, actor=request.user, action=action)
                     order.status = PurchaseOrder.Status.SUBMITTED
                 form.save()
                 items.save()
@@ -107,7 +111,11 @@ def detail(request, pk):
         if getattr(exc.__cause__, "sqlstate", None) != "23505":
             raise
         form.add_error("number", "PO number already exists.")
-    return render(request, "orders/detail.html", {"order": order, "form": form, "items": items, "editable": editable})
+    return render(request, "orders/detail.html", {
+        "order": order, "form": form, "items": items, "editable": editable,
+        "can_decide": APPROVER in roles and request.user.pk != order.creator_id and order.status == PurchaseOrder.Status.SUBMITTED,
+        "history": order.history.select_related("actor"),
+    })
 
 
 @login_required

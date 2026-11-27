@@ -7,6 +7,8 @@ class PurchaseOrder(models.Model):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
         SUBMITTED = "SUBMITTED", "Submitted"
+        REJECTED = "REJECTED", "Rejected"
+        APPROVED = "APPROVED", "Approved"
 
     number = models.CharField(max_length=64, unique=True)
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
@@ -27,3 +29,20 @@ class LineItem(models.Model):
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=14, decimal_places=2)
     line_total = models.DecimalField(max_digits=16, decimal_places=2)
+
+
+class HistoryEntry(models.Model):
+    class Action(models.TextChoices):
+        SUBMIT = "SUBMIT", "Submitted"
+        RESUBMIT = "RESUBMIT", "Resubmitted"
+        APPROVE = "APPROVE", "Approved"
+        REJECT = "REJECT", "Rejected"
+
+    order = models.ForeignKey(PurchaseOrder, related_name="history", on_delete=models.PROTECT)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    action = models.CharField(max_length=8, choices=Action)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    remark = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["pk"]

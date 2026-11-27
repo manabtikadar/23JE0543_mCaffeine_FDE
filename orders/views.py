@@ -2,12 +2,13 @@ import json
 
 from django import forms
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from django.views.decorators.http import require_http_methods, require_safe
+from django.views.decorators.http import require_http_methods, require_POST, require_safe
 
 from .access import APPROVER, CREATOR, roles_for, visible_orders
-from .models import PurchaseOrder
+from .models import HistoryEntry, PurchaseOrder
 
 
 class DraftForm(forms.Form):
@@ -94,4 +95,37 @@ def approval_queue(request):
     if APPROVER not in roles_for(request.user):
         return forbidden()
     orders = PurchaseOrder.objects.filter(status=PurchaseOrder.Status.SUBMITTED).order_by("pk")
+    if request.GET.get("view") == "page":
+        return render(request, "orders/queue.html", {"orders": orders})
     return JsonResponse({"orders": list(orders.values(*ORDER_FIELDS))})
+
+
+@require_POST
+@transaction.atomic
+def decide(request, pk, action):
+    if APPROVER not in roles_for(request.user):
+        return forbidden()
+    order = PurchaseOrder.objects.select_for_update().filter(pk=pk).first()
+    if order is None or (order.status == PurchaseOrder.Status.DRAFT and order.creator_id != request.user.pk):
+        return JsonResponse({"detail": "PO not found."}, status=404)
+    if order.creator_id == request.user.pk:
+        return forbidden()
+    if order.status != PurchaseOrder.Status.SUBMITTED:
+        return JsonResponse({"detail": "Only submitted orders can be decided."}, status=409)
+    data = request.POST
+    if request.content_type == "application/json":
+        try:
+            data = json.loads(request.body)
+        except (ValueError, UnicodeDecodeError):
+            data = None
+        if not isinstance(data, dict):
+            return JsonResponse({"detail": "Expected a JSON object."}, status=400)
+    remark = data.get("reason", data.get("remark", ""))
+    if not isinstance(remark, str) or (action == HistoryEntry.Action.REJECT and not remark.strip()):
+        return JsonResponse({"detail": "Enter a reason for rejection."}, status=400)
+    order.status = PurchaseOrder.Status.APPROVED if action == HistoryEntry.Action.APPROVE else PurchaseOrder.Status.REJECTED
+    order.save(update_fields=["status"])
+    HistoryEntry.objects.create(order=order, actor=request.user, action=action, remark=remark.strip())
+    if request.POST.get("from_detail") == "1":
+        return redirect("workspace")
+    return JsonResponse({"id": order.pk, "status": order.status})

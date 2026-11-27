@@ -15,7 +15,7 @@
   <template id="empty"><fieldset><legend>New line item</legend>{{ items.empty_form.as_p }}</fieldset></template>
   <button type="button" id="add">Add line item</button>
   <button type="submit">Save draft</button>
-  <button type="submit" name="action" value="submit">Submit for approval</button>
+  <button type="submit" name="action" value="submit">{% if order.status == "REJECTED" %}Resubmit for approval{% else %}Submit for approval{% endif %}</button>
 </form>
 <script>
 document.querySelector("#add").onclick = () => {
@@ -29,4 +29,18 @@ document.querySelector("#add").onclick = () => {
 <p>Printed total ₹{{ order.printed_total|default_if_none:"—" }}</p>
 <ul>{% for item in order.items.all %}<li>{{ item.sku }} · {{ item.description }} · {{ item.quantity }} × ₹{{ item.unit_price }} · ₹{{ item.line_total }}</li>{% endfor %}</ul>
 {% endif %}
+{% if can_decide %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="from_detail" value="1">
+  <label for="remark">Remark (required for rejection)</label>
+  <textarea name="remark" id="remark" required></textarea>
+  <button formaction="{% url 'approve' order.pk %}" formnovalidate>Approve</button>
+  <button formaction="{% url 'reject' order.pk %}">Reject</button>
+</form>
+{% endif %}
+<h2>Action history</h2>
+<ol>{% for entry in history %}
+  <li>{{ entry.recorded_at|date:"Y-m-d H:i:s T" }} · {{ entry.actor.username }} · {{ entry.get_action_display }}{% if entry.remark %} — {{ entry.remark }}{% endif %}</li>
+{% empty %}<li>No actions recorded.</li>{% endfor %}</ol>
 {% endblock %}

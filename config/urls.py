@@ -3,10 +3,13 @@ from django.contrib.auth.views import LoginView, LogoutView
 
 from orders import views as orders
 from orders import drafts
+from orders.models import HistoryEntry
 
 from . import views
 
 urlpatterns = [
+    path("api/pos/<int:pk>/approve/", orders.decide, {"action": HistoryEntry.Action.APPROVE}, name="approve"),
+    path("api/pos/<int:pk>/reject/", orders.decide, {"action": HistoryEntry.Action.REJECT}, name="reject"),
     path("pos/<int:pk>/", drafts.detail, name="draft-detail"),
     path("pos/<int:pk>/original/", drafts.original, name="original"),
     path("", orders.workspace, name="workspace"),
