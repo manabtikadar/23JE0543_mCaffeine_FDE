@@ -4,6 +4,7 @@ from decimal import Decimal
 from django import forms
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
+from django.db.models import Sum
 from django.forms import inlineformset_factory
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -58,6 +59,13 @@ class LineForm(RupeeModelForm):
 Items = inlineformset_factory(PurchaseOrder, LineItem, form=LineForm, fields=["sku", "description", "quantity", "unit_price", "line_total"], extra=1, can_delete=True)
 
 
+def total_warning(printed, line_sum):
+    if printed is None or line_sum is None or abs(printed - line_sum) <= 100:
+        return ""
+    return (f"Printed total must match the line items within ₹1. Printed total ₹{rupees(printed):,.2f}. "
+            f"Lines total ₹{rupees(line_sum):,.2f}. Difference ₹{rupees(abs(printed - line_sum)):,.2f}.")
+
+
 def validate_submission(form, items):
     rows = [row for row in items if row.cleaned_data and not row.cleaned_data.get("DELETE")]
     existing = set(items.get_queryset().values_list("pk", flat=True))
@@ -72,10 +80,9 @@ def validate_submission(form, items):
         total += amount
         if abs(qty * price - amount) > 100:
             row.add_error("line_total", f"Quantity × unit price gives ₹{rupees(qty * price):,.2f}. Check the line total (₹1 tolerance).")
-    printed = form.cleaned_data.get("printed_total")
-    if rows and printed is not None and abs(total - printed) > 100:
-        form.add_error("printed_total", f"Printed total must match the line items within ₹1. "
-            f"Lines total ₹{rupees(total):,.2f}. Difference ₹{rupees(abs(total - printed)):,.2f}.")
+    warning = total_warning(form.cleaned_data.get("printed_total"), total if rows else None)
+    if warning:
+        form.add_error("printed_total", warning)
 
 
 @login_required
@@ -125,13 +132,18 @@ def detail(request, pk):
         if getattr(exc.__cause__, "sqlstate", None) != "23505":
             raise
         form.add_error("number", "PO number already exists.")
-    has_lines = order.items.exists()
+    line_sum = order.items.aggregate(total=Sum("line_total"))["total"]
+    has_lines = line_sum is not None
+    warning = total_warning(order.printed_total, line_sum) if not form.is_bound else ""
+    if warning and editable:
+        form.fields["printed_total"].widget.attrs.update({"aria-invalid": "true", "aria-describedby": "total-warning"})
     if items.is_bound:
         has_lines = any(row.has_changed() or row.instance.pk for row in items
                         if not row.cleaned_data.get("DELETE")) if items.is_valid() else True
     return render(request, "orders/detail.html", {
         "order": order, "form": form, "items": items, "editable": editable,
         "has_lines": has_lines,
+        "total_warning": warning,
         "can_decide": APPROVER in roles and request.user.pk != order.creator_id and order.status == PurchaseOrder.Status.SUBMITTED,
         "history": order.history.select_related("actor"),
     })

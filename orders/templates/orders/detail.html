@@ -8,6 +8,7 @@
 <p role="status">This PDF can’t be read automatically. Enter the details by hand using the original below.</p>
 {% endif %}
 <p>{{ order.get_status_display }}</p>
+{% if total_warning %}<p class="errorlist" id="total-warning" role="alert">{{ total_warning }}</p>{% endif %}
 {% if not has_lines %}<p>Line items not checked</p>{% endif %}
 {% if order.pdf_key %}<p><a href="{% url 'original' order.pk %}" target="_blank" rel="noopener">Open original PDF</a></p>{% endif %}
 {% if editable and order.pdf_key %}

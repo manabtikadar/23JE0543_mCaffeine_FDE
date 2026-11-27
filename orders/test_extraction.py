@@ -60,6 +60,7 @@ class ExtractionTests(TestCase):
             self.assertEqual((order.vendor, order.po_date.isoformat(), order.printed_total), (vendor, date, total))
             rows = list(order.items.order_by("pk"))
             if number == "PO-2026-001":
+                self.assertNotContains(response, 'id="total-warning"')
                 self.assertEqual(len(rows), 5)
                 self.assertEqual([row.sku for row in rows], ["MC-001", "MC-014", "HY-203", "MC-027", "HY-118"])
                 self.assertEqual(rows[3].description, "Coffee Body Scrub with Arabica Extract and Walnut Shell 250g")
@@ -74,6 +75,8 @@ class ExtractionTests(TestCase):
                 self.assertEqual(order.status, "SUBMITTED")
                 self.assertEqual(order.items.get(sku="MC-001").description, "Reviewed body wash")
             else:
+                self.assertContains(response, "Difference ₹18,000.00")
+                self.assertContains(self.client.get(reverse("draft-detail", args=[order.pk])), "Difference ₹18,000.00")
                 self.assertEqual(len(rows), 3)
                 self.assertEqual(sum(row.line_total for row in rows), 12450000)
                 invalid = self.client.post(reverse("draft-detail", args=[order.pk]),
