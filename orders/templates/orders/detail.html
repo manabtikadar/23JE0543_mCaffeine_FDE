@@ -15,6 +15,7 @@
   <template id="empty"><fieldset><legend>New line item</legend>{{ items.empty_form.as_p }}</fieldset></template>
   <button type="button" id="add">Add line item</button>
   <button type="submit">Save draft</button>
+  <button type="submit" name="action" value="submit">Submit for approval</button>
 </form>
 <script>
 document.querySelector("#add").onclick = () => {

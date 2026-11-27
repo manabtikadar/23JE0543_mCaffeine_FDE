@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from html.parser import HTMLParser
 
 from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -9,7 +10,61 @@ from django.urls import reverse
 from .models import PurchaseOrder
 
 
+class PageInputs(HTMLParser):
+    """Collect successful text and hidden controls, excluding the inert row template."""
+    def __init__(self, response):
+        super().__init__()
+        self.values = {}
+        self.in_template = False
+        self.feed(response.content.decode())
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "template":
+            self.in_template = True
+        if tag == "input" and not self.in_template and "name" in attrs and attrs.get("type") not in {"checkbox", "file"}:
+            self.values[attrs["name"]] = attrs.get("value", "")
+
+    def handle_endtag(self, tag):
+        if tag == "template":
+            self.in_template = False
+
+
 class ManualDraftTests(TestCase):
+    def test_edit_page_save_reopen_and_submit(self):
+        page = reverse("draft-detail", args=[self.order.pk])
+        response = self.client.get(page)
+        data = PageInputs(response).values
+        fields = {"number": self.order.number, "vendor": "ABC", "po_date": "2026-11-15",
+                  "printed_total": "60.00", "items-0-sku": "MC-001", "items-0-description": "Body wash",
+                  "items-0-quantity": "2", "items-0-unit_price": "30.00", "items-0-line_total": "60.00"}
+        self.assertTrue(fields.keys() <= data.keys())
+        self.assertEqual(data["number"], self.order.number)
+        data.update(fields)
+        invalid = self.client.post(page, {**data, "number": ""})
+        self.assertContains(invalid, "This field is required")
+        self.assertEqual(PageInputs(invalid).values["vendor"], "ABC")
+        self.assertFalse(self.order.items.exists())
+        self.assertRedirects(self.client.post(page, data), page)
+        reopened = self.client.get(page)
+        saved = PageInputs(reopened).values
+        for name, value in fields.items():
+            self.assertEqual(saved[name], value)
+        self.assertContains(reopened, 'value="submit"')
+        rejected = self.client.post(page, {**saved, "action": "submit", "printed_total": "99.00"})
+        self.assertContains(rejected, "Printed total must match")
+        self.assertEqual(PageInputs(rejected).values["printed_total"], "99.00")
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, PurchaseOrder.Status.DRAFT)
+        self.assertRedirects(self.client.post(page, {**saved, "action": "submit"}), page)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, PurchaseOrder.Status.SUBMITTED)
+        approver = User.objects.create_user("approver1")
+        Group.objects.create(name="Approver").user_set.add(approver)
+        self.client.force_login(approver)
+        queue = self.client.get(reverse("approval-queue")).json()["orders"]
+        self.assertEqual([row["id"] for row in queue], [self.order.pk])
+
     def setUp(self):
         self.owner = User.objects.create_user("owner")
         self.other = User.objects.create_user("other")

@@ -42,6 +42,31 @@ class HeaderForm(forms.ModelForm):
 Items = inlineformset_factory(PurchaseOrder, LineItem, fields=["sku", "description", "quantity", "unit_price", "line_total"], extra=1, can_delete=True)
 
 
+def validate_submission(form, items):
+    for name in ("po_date", "vendor", "printed_total"):
+        if form.cleaned_data.get(name) in (None, ""):
+            form.add_error(name, "Required for submission.")
+    rows = [row for row in items if row.cleaned_data and not row.cleaned_data.get("DELETE")]
+    if not rows:
+        form.add_error(None, "Enter at least one line item before submitting.")
+        return
+    existing = set(items.get_queryset().values_list("pk", flat=True))
+    posted = [row.instance.pk for row in items.initial_forms]
+    if len(posted) != len(existing) or set(posted) != existing:
+        form.add_error(None, "The line items changed. Reload the draft before submitting.")
+        return
+    total = 0
+    for row in rows:
+        values = row.cleaned_data
+        qty, price, amount = values["quantity"], values["unit_price"], values["line_total"]
+        total += amount
+        if qty <= 0 or price <= 0 or abs(qty * price - amount) > 1:
+            row.add_error("line_total", "Check the positive quantity, unit price and line total.")
+    printed = form.cleaned_data.get("printed_total")
+    if printed is not None and abs(total - printed) > 1:
+        form.add_error("printed_total", "Printed total must match the line items within ₹1.")
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def detail(request, pk):
@@ -57,8 +82,11 @@ def detail(request, pk):
             if request.method == "POST" and not editable:
                 return HttpResponse("Permission denied.", status=403)
             data = request.POST if request.method == "POST" else None
-            form = HeaderForm(data, request.FILES, instance=order)
+            form = HeaderForm(data, request.FILES if data is not None else None, instance=order)
             items = Items(data, instance=order)
+            submitting = request.POST.get("action") == "submit"
+            if data is not None and form.is_valid() and items.is_valid() and submitting:
+                validate_submission(form, items)
             if data is not None and form.is_valid() and items.is_valid():
                 file = form.cleaned_data["pdf"]
                 if file:
@@ -66,6 +94,8 @@ def detail(request, pk):
                     key = f"{order.pk}/{uuid4().hex}.pdf"
                     storage.storage_request("object/po-originals/" + key, "POST", file.read(), "application/pdf")
                     saved_key = order.pdf_key = key
+                if submitting:
+                    order.status = PurchaseOrder.Status.SUBMITTED
                 form.save()
                 items.save()
                 return redirect("draft-detail", pk=pk)
