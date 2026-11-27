@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Purchase orders{% endblock %} · PEP Brands</title>
+  <style>
+    body { max-width: 48rem; margin: 3rem auto; padding: 0 1.25rem; font: 1rem/1.55 system-ui, sans-serif; color: #202a27; }
+    header, footer { padding: .75rem 0; border-bottom: 1px solid #ccd4ce; }
+    footer { margin-top: 2rem; border-top: 1px solid #ccd4ce; border-bottom: 0; }
+    input, button { padding: .45rem .65rem; font: inherit; }
+    label { display: block; }
+    a { color: #145a45; }
+    .errorlist { color: #942f29; }
+  </style>
+</head>
+<body>
+  <header>PEP Brands · Procurement</header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer><a href="/health">Check database connection</a></footer>
+</body>
+</html>

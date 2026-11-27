@@ -6,10 +6,18 @@ services:
     branch: main
     region: singapore
     buildCommand: python -m pip install -r requirements.txt
-    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: python manage.py migrate --noinput && python manage.py provision_accounts && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         sync: false
       - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: CREATOR1_PASSWORD
+        generateValue: true
+      - key: CREATOR2_PASSWORD
+        generateValue: true
+      - key: APPROVER1_PASSWORD
+        generateValue: true
+      - key: LEAD1_PASSWORD
         generateValue: true

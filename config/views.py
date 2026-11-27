@@ -1,21 +1,11 @@
 import logging
 
 from django.db import DatabaseError, InterfaceError, connection
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_safe
 
 logger = logging.getLogger(__name__)
-
-
-@require_safe
-def home(request):
-    return HttpResponse(
-        '<!doctype html><html lang="en"><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        '<title>Purchase orders</title><main><h1>PEP Brands purchase orders</h1>'
-        '<p><a href="/health">Check database connection</a></p></main></html>'
-    )
 
 
 @require_safe

@@ -13,10 +13,31 @@ DEBUG = False
 TIME_ZONE = "UTC"
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
-INSTALLED_APPS = []
+INSTALLED_APPS = [
+    "django.contrib.contenttypes",
+    "django.contrib.auth",
+    "django.contrib.sessions",
+    "orders",
+]
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/login/"
+TEMPLATES = [{
+    "BACKEND": "django.template.backends.django.DjangoTemplates",
+    "APP_DIRS": True,
+    "OPTIONS": {"context_processors": ["django.contrib.auth.context_processors.auth"]},
+}]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "orders.access.require_api_session",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
