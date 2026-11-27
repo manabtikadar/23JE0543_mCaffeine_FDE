@@ -1,7 +1,7 @@
 # Manab Tikadar · 23JE0543
 ## Purchase order review for PEP Brands
 
-[Login credentials](#login-credentials) · [Open the live app](https://mcaffeine-po-23je0543.onrender.com/) · [Database health](https://mcaffeine-po-23je0543.onrender.com/health) · [Test PDFs](brief/) · [AI conversation](ai-session/conversation.md)
+[DEMO video](https://drive.google.com/file/d/1EDLMe3M1aJdPlEEl38MFUsC_XZDhw3Pm/view?usp=sharing) · [Login credentials](#login-credentials) · [Open the live app](https://mcaffeine-po-23je0543.onrender.com/) · [Database health](https://mcaffeine-po-23je0543.onrender.com/health) · [Test PDFs](brief/) · [AI conversation](ai-session/conversation.md)
 
 Operations uploads the supplier’s original, corrects the extracted figures and submits the PO. Finance can return it with a reason or approve it. The owner can reopen the original and history from the same PO after the decision.
 
