@@ -15,7 +15,7 @@ class PurchaseOrder(models.Model):
     status = models.CharField(max_length=12, choices=Status, default=Status.DRAFT)
     vendor = models.CharField(max_length=200, blank=True)
     po_date = models.DateField(null=True, blank=True)
-    printed_total = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
+    printed_total = models.BigIntegerField(db_column="printed_total_paise", null=True, blank=True)
     pdf_key = models.CharField(max_length=160, blank=True, editable=False)
 
     class Meta:
@@ -27,8 +27,8 @@ class LineItem(models.Model):
     sku = models.CharField(max_length=64)
     description = models.CharField(max_length=500)
     quantity = models.PositiveIntegerField()
-    unit_price = models.DecimalField(max_digits=14, decimal_places=2)
-    line_total = models.DecimalField(max_digits=16, decimal_places=2)
+    unit_price = models.BigIntegerField(db_column="unit_price_paise")
+    line_total = models.BigIntegerField(db_column="line_total_paise")
 
 
 class HistoryEntry(models.Model):

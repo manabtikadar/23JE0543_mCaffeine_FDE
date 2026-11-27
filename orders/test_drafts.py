@@ -31,11 +31,41 @@ class PageInputs(HTMLParser):
 
 
 class ManualDraftTests(TestCase):
+    def test_sample_two_and_one_rupee_boundary(self):
+        page = reverse("draft-detail", args=[self.order.pk])
+        self.assertContains(self.client.get(page), "Line items not checked")
+        data = {"number": "PO-2026-003", "po_date": "20.11.2026", "vendor": "XYZ Cosmetics LLP",
+                "printed_total": "INR 1,42,500.00", "items-INITIAL_FORMS": "0", "items-TOTAL_FORMS": "3",
+                "action": "submit"}
+        for index, (sku, description, qty, price, amount) in enumerate([
+            ("MC-001", "Body Wash 200ml", 500, "INR 120.00", "60,000.00"),
+            ("MC-014", "Coffee Face Scrub 100g", 300, "Rs. 95.00", "28,500.00"),
+            ("HY-203", "Sunscreen SPF50 50ml", 200, "₹180.00", "36,000.00"),
+        ]):
+            for key, value in dict(sku=sku, description=description, quantity=qty, unit_price=price, line_total=amount).items():
+                data[f"items-{index}-{key}"] = value
+        response = self.client.post(page, data)
+        self.assertContains(response, "Difference ₹18,000.00")
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "DRAFT")
+        self.assertFalse(self.order.history.exists())
+        data.update({"items-0-line_total": "60001.01", "printed_total": "124502.02"})
+        response = self.client.post(page, data)
+        self.assertIn("line_total", response.context["items"][0].errors)
+        self.assertIn("printed_total", response.context["form"].errors)
+        data.update({"items-0-line_total": "60001.00", "printed_total": "124502.00"})
+        self.assertRedirects(self.client.post(page, data), page)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.printed_total, 12450200)
+        self.assertEqual(self.order.items.get(sku="MC-001").unit_price, 12000)
+        self.assertEqual(self.order.po_date.isoformat(), "2026-11-20")
+        self.assertContains(self.client.get(page), "20-11-2026")
+
     def test_edit_page_save_reopen_and_submit(self):
         page = reverse("draft-detail", args=[self.order.pk])
         response = self.client.get(page)
         data = PageInputs(response).values
-        fields = {"number": self.order.number, "vendor": "ABC", "po_date": "2026-11-15",
+        fields = {"number": self.order.number, "vendor": "ABC", "po_date": "15-11-2026",
                   "printed_total": "60.00", "items-0-sku": "MC-001", "items-0-description": "Body wash",
                   "items-0-quantity": "2", "items-0-unit_price": "30.00", "items-0-line_total": "60.00"}
         self.assertTrue(fields.keys() <= data.keys())

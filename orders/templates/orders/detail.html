@@ -1,8 +1,10 @@
 {% extends "orders/base.html" %}
+{% load currency %}
 {% block content %}
 <p><a href="/">Purchase orders</a></p>
 <h1>{{ order.number }}</h1>
 <p>{{ order.get_status_display }}</p>
+{% if not has_lines %}<p>Line items not checked</p>{% endif %}
 {% if order.pdf_key %}<p><a href="{% url 'original' order.pk %}" target="_blank" rel="noopener">Open original PDF</a></p>{% endif %}
 {% if editable %}
 <form method="post" enctype="multipart/form-data">
@@ -26,8 +28,8 @@ document.querySelector("#add").onclick = () => {
 </script>
 {% else %}
 <p>{{ order.vendor }} · {{ order.po_date|date:"d-m-Y" }}</p>
-<p>Printed total ₹{{ order.printed_total|default_if_none:"—" }}</p>
-<ul>{% for item in order.items.all %}<li>{{ item.sku }} · {{ item.description }} · {{ item.quantity }} × ₹{{ item.unit_price }} · ₹{{ item.line_total }}</li>{% endfor %}</ul>
+<p>Printed total ₹{{ order.printed_total|rupees|default_if_none:"—" }}</p>
+<ul>{% for item in order.items.all %}<li>{{ item.sku }} · {{ item.description }} · {{ item.quantity }} × ₹{{ item.unit_price|rupees }} · ₹{{ item.line_total|rupees }}</li>{% endfor %}</ul>
 {% endif %}
 {% if can_decide %}
 <form method="post">

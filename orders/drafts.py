@@ -1,4 +1,5 @@
 from uuid import uuid4
+from decimal import Decimal
 
 from django import forms
 from django.contrib.auth.decorators import login_required
@@ -12,15 +13,19 @@ from django.views.decorators.http import require_http_methods, require_safe
 from . import storage
 from .access import APPROVER, CREATOR, roles_for, visible_orders
 from .models import HistoryEntry, LineItem, PurchaseOrder
+from .money import MoneyInput, RupeeModelForm, rupees
 
 
-class HeaderForm(forms.ModelForm):
+class HeaderForm(RupeeModelForm):
+    po_date = forms.DateField(required=False, label="PO date (DD-MM-YYYY)",
+        input_formats=["%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y", "%d.%m.%Y", "%d %b %Y"],
+        widget=forms.DateInput(format="%d-%m-%Y"))
+    printed_total = MoneyInput(required=False, decimal_places=2, max_digits=16)
     pdf = forms.FileField(required=False, label="Original PDF (up to 5 MB)")
 
     class Meta:
         model = PurchaseOrder
         fields = ["number", "po_date", "vendor", "printed_total"]
-        widgets = {"po_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})}
 
     def clean_number(self):
         value = self.cleaned_data["number"].strip().upper()
@@ -39,17 +44,17 @@ class HeaderForm(forms.ModelForm):
         return file
 
 
-Items = inlineformset_factory(PurchaseOrder, LineItem, fields=["sku", "description", "quantity", "unit_price", "line_total"], extra=1, can_delete=True)
+class LineForm(RupeeModelForm):
+    quantity = forms.IntegerField(min_value=1)
+    unit_price = MoneyInput(min_value=Decimal("0.01"), decimal_places=2, max_digits=14)
+    line_total = MoneyInput(decimal_places=2, max_digits=16)
+
+
+Items = inlineformset_factory(PurchaseOrder, LineItem, form=LineForm, fields=["sku", "description", "quantity", "unit_price", "line_total"], extra=1, can_delete=True)
 
 
 def validate_submission(form, items):
-    for name in ("po_date", "vendor", "printed_total"):
-        if form.cleaned_data.get(name) in (None, ""):
-            form.add_error(name, "Required for submission.")
     rows = [row for row in items if row.cleaned_data and not row.cleaned_data.get("DELETE")]
-    if not rows:
-        form.add_error(None, "Enter at least one line item before submitting.")
-        return
     existing = set(items.get_queryset().values_list("pk", flat=True))
     posted = [row.instance.pk for row in items.initial_forms]
     if len(posted) != len(existing) or set(posted) != existing:
@@ -60,11 +65,12 @@ def validate_submission(form, items):
         values = row.cleaned_data
         qty, price, amount = values["quantity"], values["unit_price"], values["line_total"]
         total += amount
-        if qty <= 0 or price <= 0 or abs(qty * price - amount) > 1:
-            row.add_error("line_total", "Check the positive quantity, unit price and line total.")
+        if abs(qty * price - amount) > 100:
+            row.add_error("line_total", f"Quantity × unit price gives ₹{rupees(qty * price):,.2f}. Check the line total (₹1 tolerance).")
     printed = form.cleaned_data.get("printed_total")
-    if printed is not None and abs(total - printed) > 1:
-        form.add_error("printed_total", "Printed total must match the line items within ₹1.")
+    if rows and printed is not None and abs(total - printed) > 100:
+        form.add_error("printed_total", f"Printed total must match the line items within ₹1. "
+            f"Lines total ₹{rupees(total):,.2f}. Difference ₹{rupees(abs(total - printed)):,.2f}.")
 
 
 @login_required
@@ -87,6 +93,9 @@ def detail(request, pk):
             form = HeaderForm(data, request.FILES if data is not None else None, instance=order)
             items = Items(data, instance=order)
             submitting = request.POST.get("action") == "submit"
+            if submitting:
+                for name in ("po_date", "vendor", "printed_total"):
+                    form.fields[name].required = True
             if data is not None and form.is_valid() and items.is_valid() and submitting:
                 validate_submission(form, items)
             if data is not None and form.is_valid() and items.is_valid():
@@ -111,8 +120,13 @@ def detail(request, pk):
         if getattr(exc.__cause__, "sqlstate", None) != "23505":
             raise
         form.add_error("number", "PO number already exists.")
+    has_lines = order.items.exists()
+    if items.is_bound:
+        has_lines = any(row.has_changed() or row.instance.pk for row in items
+                        if not row.cleaned_data.get("DELETE")) if items.is_valid() else True
     return render(request, "orders/detail.html", {
         "order": order, "form": form, "items": items, "editable": editable,
+        "has_lines": has_lines,
         "can_decide": APPROVER in roles and request.user.pk != order.creator_id and order.status == PurchaseOrder.Status.SUBMITTED,
         "history": order.history.select_related("actor"),
     })
