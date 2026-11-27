@@ -2,6 +2,7 @@ import json
 
 from django import forms
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
@@ -9,6 +10,8 @@ from django.views.decorators.http import require_http_methods, require_POST, req
 
 from .access import APPROVER, CREATOR, roles_for, visible_orders
 from .models import HistoryEntry, PurchaseOrder
+from .extraction import upload_draft
+from .storage import StorageUnavailable
 
 
 class DraftForm(forms.Form):
@@ -41,11 +44,22 @@ def workspace(request):
     roles = roles_for(request.user)
     if not roles or (request.method == "POST" and CREATOR not in roles):
         return forbidden()
-    form = DraftForm(request.POST if request.method == "POST" else None)
-    if request.method == "POST" and form.create_for(request.user):
+    uploading = request.method == "POST" and request.POST.get("action") == "upload"
+    upload_error = ""
+    form = DraftForm(request.POST if request.method == "POST" and not uploading else None)
+    if uploading:
+        try:
+            order = upload_draft(request.user, request.FILES.get("pdf"))
+            return redirect("draft-detail", pk=order.pk)
+        except ValidationError as exc:
+            upload_error = exc.messages[0]
+        except StorageUnavailable as exc:
+            upload_error = str(exc)
+    elif request.method == "POST" and form.create_for(request.user):
         return redirect("workspace")
     return render(request, "orders/workspace.html", {
         "roles": sorted(roles),
+        "upload_error": upload_error,
         "can_create": CREATOR in roles,
         "can_review": APPROVER in roles,
         "orders": visible_orders(request.user, roles),

@@ -2,6 +2,12 @@
 
 ## Deployment milestone
 
+### Level 1 PDF review
+
+Sign in as a creator and choose **Upload and review** on the home page. The app reads the PDF text layer with pdfplumber and looks for a labelled PO number, vendor, date and printed total. It needs at least two recognizable fields before it prefills a draft. Review and correct the values alongside the private original. An unreadable or garbled text layer opens a blank manual-entry draft with the original attached. The detail page shows the saved extraction method.
+
+The reader supports the supplied numeric and month-name dates and INR, Rs. and ₹ amounts. It uses the printed document total. Enter line items manually at this level. Sample 3 should be reported as a duplicate after sample 1 exists. Image-only documents and layouts with unfamiliar labels may require manual entry.
+
 ### Manual drafts and original PDFs
 
 Create a draft on the home page, open its PO number, and enter the date, vendor, printed total and line items. Save the draft to keep your edits. A creator can attach one original PDF up to 5 MB and reopen it from the detail page.

@@ -2,10 +2,17 @@
 {% load currency %}
 {% block content %}
 <p><a href="/">Purchase orders</a></p>
-<h1>{{ order.number }}</h1>
+<h1>{{ order.number|default:"Unnumbered draft" }}</h1>
+<p>Extraction method: {{ order.get_extraction_method_display }}</p>
+{% if order.extraction_method == "unreadable" and not order.number %}
+<p role="status">This PDF can’t be read automatically. Enter the details by hand using the original below.</p>
+{% endif %}
 <p>{{ order.get_status_display }}</p>
 {% if not has_lines %}<p>Line items not checked</p>{% endif %}
 {% if order.pdf_key %}<p><a href="{% url 'original' order.pk %}" target="_blank" rel="noopener">Open original PDF</a></p>{% endif %}
+{% if editable and order.pdf_key %}
+<iframe title="Original purchase order PDF" src="{% url 'original' order.pk %}" width="100%" height="420"></iframe>
+{% endif %}
 {% if editable %}
 <form method="post" enctype="multipart/form-data">
   {% csrf_token %}

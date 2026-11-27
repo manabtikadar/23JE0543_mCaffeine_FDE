@@ -8,6 +8,7 @@ from django.forms import inlineformset_factory
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import never_cache
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_http_methods, require_safe
 
 from . import storage
@@ -135,6 +136,7 @@ def detail(request, pk):
 @login_required
 @require_safe
 @never_cache
+@xframe_options_sameorigin
 def original(request, pk):
     order = get_object_or_404(visible_orders(request.user, roles_for(request.user)), pk=pk)
     if not order.pdf_key:
@@ -146,5 +148,5 @@ def original(request, pk):
         return HttpResponse(str(exc), status=503)
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = 'inline; filename="purchase-order.pdf"'
-    response["Content-Security-Policy"] = "sandbox"
+    response["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'self'"
     return response

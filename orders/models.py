@@ -10,7 +10,13 @@ class PurchaseOrder(models.Model):
         REJECTED = "REJECTED", "Rejected"
         APPROVED = "APPROVED", "Approved"
 
-    number = models.CharField(max_length=64, unique=True)
+    class Extraction(models.TextChoices):
+        MANUAL = "manual", "Manual entry"
+        TEXT = "text_layer", "PDF text layer"
+        UNREADABLE = "unreadable", "Manual entry (unreadable text layer)"
+
+    number = models.CharField(max_length=64, unique=True, null=True)
+    extraction_method = models.CharField(max_length=16, choices=Extraction, default=Extraction.MANUAL)
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     status = models.CharField(max_length=12, choices=Status, default=Status.DRAFT)
     vendor = models.CharField(max_length=200, blank=True)

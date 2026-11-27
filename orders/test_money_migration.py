@@ -16,7 +16,7 @@ class MoneyMigrationTests(TransactionTestCase):
             return executor.loader.project_state(target).apps
 
         old = migrate(before)
-        self.addCleanup(migrate, after)
+        self.addCleanup(migrate, MigrationExecutor(connection).loader.graph.leaf_nodes())
         owner = old.get_model("auth", "User").objects.create(username="migration-owner")
         po = old.get_model("orders", "PurchaseOrder").objects.create(
             creator=owner, number="MIGRATION-1", printed_total=Decimal("245.50"))
