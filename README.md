@@ -76,3 +76,5 @@ python manage.py runserver
 ```
 
 Open http://127.0.0.1:8000/. Provisioning sets passwords when accounts are first created. Tests use a separate test database and mock object storage. [Render deployment configuration](render.yaml) installs dependencies, applies migrations, provisions accounts and starts Gunicorn on the assigned port.
+
+**Release checks, 28 November 2026.** All 21 local tests passed with the five PDFs present. In a fresh Edge InPrivate profile, the public raw README led to the Render sign-in form and a healthy database response. An anonymous live API request returned 401. The authenticated walkthrough and retrieval from live Storage still require the current demo passwords.
