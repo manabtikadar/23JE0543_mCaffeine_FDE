@@ -2,6 +2,12 @@
 
 ## Deployment milestone
 
+### Manual drafts and original PDFs
+
+Create a draft on the home page, open its PO number, and enter the date, vendor, printed total and line items. Save the draft to keep your edits. A creator can attach one original PDF up to 5 MB and reopen it from the detail page.
+
+In the connected Supabase project, open **Storage → New bucket**, enter **po-originals**, and leave **Public bucket** off. In **Render → web service → Environment**, set **SUPABASE_URL** to the project's HTTPS URL and **SUPABASE_SERVICE_ROLE_KEY** to its private service_role key from Supabase Project Settings → API Keys. Save and deploy. Django checks that the bucket is private and checks PO access before retrieving each PDF. Keep the key in Render or an ignored local environment file.
+
 A single Django web service runs on Render and connects to Supabase PostgreSQL. The public landing page links to `/health`. Each health request executes `SELECT 1` and returns either HTTP 200 with `{"status":"ok"}` or HTTP 503 with `{"status":"unavailable"}`. The service logs database failures with a timestamp and error class. This milestone needs no tables or migrations.
 
 ### Deploy from the dashboards

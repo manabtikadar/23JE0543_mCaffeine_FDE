@@ -13,7 +13,7 @@
 <h2>Available purchase orders</h2>
 <ul>
   {% for order in orders %}
-    <li><a href="{% url 'order-detail' order.pk %}">{{ order.number }}</a> · {{ order.get_status_display }}</li>
+    <li><a href="{% url 'draft-detail' order.pk %}">{{ order.number }}</a> · {{ order.get_status_display }}</li>
   {% empty %}
     <li>No purchase orders to display.</li>
   {% endfor %}
