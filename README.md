@@ -1,20 +1,20 @@
 # Manab Tikadar · 23JE0543
 ## Purchase order review for PEP Brands
 
-[Open the live app](https://mcaffeine-po-23je0543.onrender.com/) · [Database health](https://mcaffeine-po-23je0543.onrender.com/health) · [Test PDFs](brief/) · [AI conversation](ai-session/conversation.md)
+[Login credentials](#login-credentials) · [Open the live app](https://mcaffeine-po-23je0543.onrender.com/) · [Database health](https://mcaffeine-po-23je0543.onrender.com/health) · [Test PDFs](brief/) · [AI conversation](ai-session/conversation.md)
 
 Operations uploads the supplier’s original, corrects the extracted figures and submits the PO. Finance can return it with a reason or approve it. The owner can reopen the original and history from the same PO after the decision.
 
-### Demo accounts and reviewer walkthrough
+### Login credentials
 
-| Username | Role | Try |
-|---|---|---|
-| creator1 | Creator | Upload and correct a PO |
-| creator2 | Creator | Upload a duplicate of creator1’s PO |
-| approver1 | Approver | Reject, then approve the corrected PO |
-| lead1 | Creator + Approver | Submit a PO and verify self-approval returns 403 |
+| Username | Demo password | Role | Try |
+|---|---|---|---|
+| creator1 | `E1nTKv1z22sX48AUX9xZ9Qcup+5O1sp/hA2yR8uIpe4=` | Creator | Upload and correct a PO |
+| creator2 | `poWWwFOAZ+YSvqLIlxPgyuZicQGi3zR/xCIfF3Q/KLI=` | Creator | Upload a duplicate of creator1’s PO |
+| approver1 | `qh+wj45LrDvhzHuMfC5Xa+eAZ9pJggmgIj+xqL2tgnM=` | Approver | Reject, then approve the corrected PO |
+| lead1 | `3GPgsiBM4Wqxc1xdpIBfQdOlClSz0YxOuFVvhpt0+7U=` | Creator + Approver | Submit a PO and verify self-approval returns 403 |
 
-Use the demo passwords supplied privately by the project owner. Only the usernames are public.
+Use these accounts to test the public demo with sample purchase orders.
 
 1. Open the live app in a private window. Sign in as **creator1**. Download [review-po.pdf](brief/review-po.pdf), choose it and click **Upload and review**. Expect `PO-REVIEW-0543`, one amber-bottle row and ₹60.00. If that number is already in use, create a manual draft with a fresh number, attach the PDF, and enter 28-11-2026, Review Packaging, three bottles at ₹20 each and ₹60 for both totals.
 2. **Submit** and note the PO page URL. As **approver1**, open the submitted queue, select that number, enter “Specify bottle material” and **Reject**.
