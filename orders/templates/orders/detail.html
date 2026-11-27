@@ -17,7 +17,14 @@
 <form method="post" enctype="multipart/form-data">
   {% csrf_token %}
   {{ form.non_field_errors }}
-  {% for field in form %}{% if field.name != "pdf" or not order.pdf_key %}<p>{{ field.label_tag }} {{ field }} {{ field.errors }}</p>{% endif %}{% endfor %}
+  {% for field in form %}{% if field.name != "pdf" or not order.pdf_key %}
+    <p>{{ field.label_tag }} {{ field }}
+    {% if field.name == "po_date" %}
+      <input type="date" id="po-calendar" aria-label="Choose PO date from calendar" hidden>
+      <button type="button" id="choose-date" hidden>Choose date</button>
+    {% endif %}
+    {{ field.errors }}</p>
+  {% endif %}{% endfor %}
   <h2>Line items</h2>
   {{ items.management_form }}{{ items.non_form_errors }}
   <div id="rows">{% for item in items %}<fieldset><legend>Line item {{ forloop.counter }}</legend>{{ item.as_p }}</fieldset>{% endfor %}</div>
@@ -27,6 +34,28 @@
   <button type="submit" name="action" value="submit">{% if order.status == "REJECTED" %}Resubmit for approval{% else %}Submit for approval{% endif %}</button>
 </form>
 <script>
+const dateText = document.getElementById("id_po_date");
+const calendar = document.getElementById("po-calendar");
+const chooseDate = document.getElementById("choose-date");
+function syncCalendar() {
+  const parts = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dateText.value);
+  calendar.value = parts ? [parts[3], parts[2], parts[1]].join("-") : dateText.value;
+}
+syncCalendar();
+dateText.addEventListener("change", syncCalendar);
+calendar.addEventListener("change", () => {
+  dateText.value = calendar.value.split("-").reverse().join("-");
+  dateText.focus();
+});
+calendar.hidden = false;
+if (typeof calendar.showPicker === "function") {
+  calendar.style.position = "absolute";
+  calendar.style.opacity = "0";
+  calendar.style.pointerEvents = "none";
+  calendar.tabIndex = -1;
+  chooseDate.hidden = false;
+  chooseDate.onclick = () => { syncCalendar(); calendar.showPicker(); };
+}
 document.querySelector("#add").onclick = () => {
   const total = document.querySelector("#id_items-TOTAL_FORMS");
   document.querySelector("#rows").insertAdjacentHTML("beforeend", document.querySelector("#empty").innerHTML.replaceAll("__prefix__", total.value));
