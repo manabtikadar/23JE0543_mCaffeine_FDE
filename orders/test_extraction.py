@@ -9,12 +9,28 @@ from django.urls import reverse
 
 from .extraction import read_header
 from .models import PurchaseOrder
+from .test_drafts import PageInputs
 
 
 BRIEF = Path(__file__).resolve().parent.parent / "brief"
 
 
 class ExtractionTests(TestCase):
+    @skipUnless((BRIEF / "sample_1_digital.pdf").exists(), "Requires the assignment PDFs in brief/")
+    @patch("orders.views.check_bucket")
+    @patch("orders.views.storage_request")
+    def test_read_stored_pdf_without_reuploading_or_overwriting(self, storage_request, check_bucket):
+        owner = User.objects.create_user("prior-creator")
+        owner.groups.add(Group.objects.create(name="Creator"))
+        self.client.force_login(owner)
+        order = PurchaseOrder.objects.create(creator=owner, number="PO-2026-001", pdf_key="uploads/original.pdf")
+        storage_request.return_value = (BRIEF / "sample_1_digital.pdf").read_bytes()
+        path = reverse("read-original-items", args=[order.pk])
+        self.assertRedirects(self.client.post(path), reverse("draft-detail", args=[order.pk]))
+        self.assertEqual(self.client.post(path).status_code, 409)
+        self.assertEqual(order.items.count(), 5)
+        storage_request.assert_called_once_with("object/authenticated/po-originals/uploads/original.pdf")
+
     def test_labelled_values_and_noisy_text(self):
         header = "Order No.: PO-42\nOrder Date: 15/11/2026\nSupplier: Green Leaf\nGrand Total: Rs. 124500"
         fields = read_header(header)
@@ -42,7 +58,29 @@ class ExtractionTests(TestCase):
             self.assertContains(response, "PDF text layer")
             order = PurchaseOrder.objects.get(number=number)
             self.assertEqual((order.vendor, order.po_date.isoformat(), order.printed_total), (vendor, date, total))
-            self.assertFalse(order.items.exists())
+            rows = list(order.items.order_by("pk"))
+            if number == "PO-2026-001":
+                self.assertEqual(len(rows), 5)
+                self.assertEqual([row.sku for row in rows], ["MC-001", "MC-014", "HY-203", "MC-027", "HY-118"])
+                self.assertEqual(rows[3].description, "Coffee Body Scrub with Arabica Extract and Walnut Shell 250g")
+                self.assertEqual((rows[3].quantity, rows[3].unit_price, rows[3].line_total), (150, 21000, 3150000))
+                self.assertEqual(sum(row.line_total for row in rows), 25420000)
+                rendered = PageInputs(response).values
+                self.assertEqual(rendered["items-INITIAL_FORMS"], "5")
+                self.assertEqual(rendered["items-3-description"], rows[3].description)
+                rendered.update({"items-0-description": "Reviewed body wash", "action": "submit"})
+                self.client.post(reverse("draft-detail", args=[order.pk]), rendered)
+                order.refresh_from_db()
+                self.assertEqual(order.status, "SUBMITTED")
+                self.assertEqual(order.items.get(sku="MC-001").description, "Reviewed body wash")
+            else:
+                self.assertEqual(len(rows), 3)
+                self.assertEqual(sum(row.line_total for row in rows), 12450000)
+                invalid = self.client.post(reverse("draft-detail", args=[order.pk]),
+                                           {**PageInputs(response).values, "action": "submit"})
+                self.assertContains(invalid, "Difference ₹18,000.00")
+                order.refresh_from_db()
+                self.assertEqual(order.status, "DRAFT")
         self.assertContains(upload("sample_3_resent.pdf"), "PO number already exists.")
         self.assertEqual(storage_request.call_count, 2)
         response = upload("sample_4_garbled.pdf")
@@ -50,6 +88,7 @@ class ExtractionTests(TestCase):
         order = response.context["order"]
         self.assertEqual((order.number, order.vendor, order.po_date, order.printed_total), (None, "", None, None))
         self.assertEqual(order.extraction_method, "unreadable")
+        self.assertFalse(order.items.exists())
         self.assertContains(response, 'title="Original purchase order PDF"')
         original = (BRIEF / "sample_4_garbled.pdf").read_bytes()
         storage_request.assert_called_with("object/po-originals/" + order.pdf_key, "POST", original, "application/pdf")

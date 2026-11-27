@@ -8,8 +8,45 @@ from django.db import IntegrityError, transaction
 from pdfplumber.utils.exceptions import MalformedPDFException, PdfminerException
 
 from . import storage
-from .drafts import HeaderForm
-from .models import PurchaseOrder
+from .drafts import HeaderForm, LineForm
+from .models import LineItem, PurchaseOrder
+
+
+MONEY = r"(?:(?:₹|Rs\.?|INR)\s*)?-?[\d,]+(?:\.\d+)?"
+ITEM_ROW = re.compile(
+    rf"(?P<sku>[\w./-]+)\s+(?P<description>.+?)\s+(?P<quantity>\d+)\s+"
+    rf"(?P<unit_price>{MONEY})\s+(?P<line_total>{MONEY})", re.I
+)
+
+
+def read_items(text):
+    rows = []
+    in_table = False
+    for line in map(str.strip, text.splitlines()):
+        if line.casefold() == "sku description qty unit price amount":
+            in_table = True
+        elif in_table and re.match(r"(?:PO|Grand) Total\b", line, re.I):
+            break
+        elif in_table and line:
+            match = ITEM_ROW.fullmatch(line)
+            if match:
+                rows.append(match.groupdict())
+            elif rows and not re.match(r"[\w]+-\d+\b", line):
+                rows[-1]["description"] += " " + line
+            else:
+                return []
+    return rows
+
+
+def save_items(order, text):
+    items = []
+    for values in read_items(text):
+        form = LineForm(values, instance=LineItem(order=order))
+        if not form.is_valid():
+            return 0
+        items.append(form.save(commit=False))
+    LineItem.objects.bulk_create(items)
+    return len(items)
 
 
 def read_header(text):
@@ -36,17 +73,21 @@ def read_header(text):
     return fields if len(fields) >= 2 else {}
 
 
-def upload_draft(user, upload):
-    if not upload or upload.size > 5 * 1024 * 1024:
-        raise ValidationError("Choose one PDF up to 5 MB.")
-    data = upload.read()
+def pdf_text(data):
     if not data.startswith(b"%PDF-"):
         raise ValidationError("Choose a valid PDF.")
     try:
         with pdfplumber.open(BytesIO(data)) as pdf:
-            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+            return "\n".join(page.extract_text() or "" for page in pdf.pages)
     except (PdfminerException, MalformedPDFException, ValueError) as exc:
         raise ValidationError("This PDF could not be opened. Choose a readable, unlocked PDF.") from exc
+
+
+def upload_draft(user, upload):
+    if not upload or upload.size > 5 * 1024 * 1024:
+        raise ValidationError("Choose one PDF up to 5 MB.")
+    data = upload.read()
+    text = pdf_text(data)
     fields = read_header(text)
     method = PurchaseOrder.Extraction.TEXT if fields else PurchaseOrder.Extraction.UNREADABLE
     key = f"uploads/{uuid4().hex}.pdf"
@@ -54,6 +95,8 @@ def upload_draft(user, upload):
     try:
         with transaction.atomic():
             order = PurchaseOrder.objects.create(creator=user, pdf_key=key, extraction_method=method, **fields)
+            if fields:
+                save_items(order, text)
             storage.check_bucket()
             storage.storage_request("object/po-originals/" + key, "POST", data, "application/pdf")
             uploaded = True

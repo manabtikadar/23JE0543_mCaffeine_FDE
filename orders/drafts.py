@@ -50,6 +50,10 @@ class LineForm(RupeeModelForm):
     unit_price = MoneyInput(min_value=Decimal("0.01"), decimal_places=2, max_digits=14)
     line_total = MoneyInput(decimal_places=2, max_digits=16)
 
+    class Meta:
+        model = LineItem
+        fields = ["sku", "description", "quantity", "unit_price", "line_total"]
+
 
 Items = inlineformset_factory(PurchaseOrder, LineItem, form=LineForm, fields=["sku", "description", "quantity", "unit_price", "line_total"], extra=1, can_delete=True)
 

@@ -2,11 +2,11 @@
 
 ## Deployment milestone
 
-### Level 1 PDF review
+### Level 1 and Level 2 PDF review
 
 Sign in as a creator and choose **Upload and review** on the home page. The app reads the PDF text layer with pdfplumber and looks for a labelled PO number, vendor, date and printed total. It needs at least two recognizable fields before it prefills a draft. Review and correct the values alongside the private original. An unreadable or garbled text layer opens a blank manual-entry draft with the original attached. The detail page shows the saved extraction method.
 
-The reader supports the supplied numeric and month-name dates and INR, Rs. and ₹ amounts. It uses the printed document total. Enter line items manually at this level. Sample 3 should be reported as a duplicate after sample 1 exists. Image-only documents and layouts with unfamiliar labels may require manual entry.
+The reader supports the supplied numeric and month-name dates and INR, Rs. and ₹ amounts. For the digital sample table it fills SKU, description, quantity, unit price and printed line total, joining wrapped descriptions. Review the rows before submitting. Submission checks the printed amounts against quantity × price and the printed PO total. For an earlier digital draft with an empty table, use **Read line items from saved PDF** before editing. Sample 3 is a duplicate after sample 1 exists. Scans, garbled text and unfamiliar tables may require manual entry.
 
 ### Manual drafts and original PDFs
 

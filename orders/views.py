@@ -5,13 +5,13 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST, require_safe
 
 from .access import APPROVER, CREATOR, roles_for, visible_orders
 from .models import HistoryEntry, PurchaseOrder
-from .extraction import upload_draft
-from .storage import StorageUnavailable
+from .extraction import pdf_text, save_items, upload_draft
+from .storage import StorageUnavailable, check_bucket, storage_request
 
 
 class DraftForm(forms.Form):
@@ -36,6 +36,28 @@ class DraftForm(forms.Form):
 
 def forbidden():
     return JsonResponse({"detail": "Permission denied."}, status=403)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def read_original_items(request, pk):
+    if CREATOR not in roles_for(request.user):
+        return forbidden()
+    order = get_object_or_404(PurchaseOrder.objects.select_for_update(), pk=pk, creator=request.user)
+    if order.status not in ("DRAFT", "REJECTED") or order.items.exists() or not order.pdf_key:
+        return JsonResponse({"detail": "Reading requires an editable PO with an original PDF and no saved rows."}, status=409)
+    try:
+        check_bucket()
+        text = pdf_text(storage_request("object/authenticated/po-originals/" + order.pdf_key))
+        count = save_items(order, text)
+    except StorageUnavailable as exc:
+        return JsonResponse({"detail": str(exc)}, status=503)
+    except ValidationError as exc:
+        return JsonResponse({"detail": exc.messages[0]}, status=400)
+    if not count:
+        return JsonResponse({"detail": "No readable line items found. Enter the rows manually."}, status=422)
+    return redirect("draft-detail", pk=pk)
 
 
 @login_required
