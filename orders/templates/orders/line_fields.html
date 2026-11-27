@@ -1,0 +1,7 @@
+{{ item.non_field_errors }}
+{% for hidden in item.hidden_fields %}{{ hidden }}{{ hidden.errors }}{% endfor %}
+{% for field in item.visible_fields %}
+  <div>{{ field.label_tag }}{{ field }}
+    <div class="field-feedback">{{ field.errors }}</div>
+  </div>
+{% endfor %}
