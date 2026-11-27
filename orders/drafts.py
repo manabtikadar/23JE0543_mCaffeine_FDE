@@ -66,21 +66,24 @@ def total_warning(printed, line_sum):
             f"Lines total ₹{rupees(line_sum):,.2f}. Difference ₹{rupees(abs(printed - line_sum)):,.2f}.")
 
 
+def validate_line_amounts(items):
+    for row in items:
+        values = row.cleaned_data
+        if values.get("DELETE") or not {"quantity", "unit_price", "line_total"} <= values.keys():
+            continue
+        expected = values["quantity"] * values["unit_price"]
+        if abs(expected - values["line_total"]) > 100:
+            row.add_error("line_total", f"Quantity × unit price gives ₹{rupees(expected):,.2f}. Check the line total (₹1 tolerance).")
+
+
 def validate_submission(form, items):
-    rows = [row for row in items if row.cleaned_data and not row.cleaned_data.get("DELETE")]
     existing = set(items.get_queryset().values_list("pk", flat=True))
     posted = [row.instance.pk for row in items.initial_forms]
     if len(posted) != len(existing) or set(posted) != existing:
         form.add_error(None, "The line items changed. Reload the draft before submitting.")
         return
-    total = 0
-    for row in rows:
-        values = row.cleaned_data
-        qty, price, amount = values["quantity"], values["unit_price"], values["line_total"]
-        total += amount
-        if abs(qty * price - amount) > 100:
-            row.add_error("line_total", f"Quantity × unit price gives ₹{rupees(qty * price):,.2f}. Check the line total (₹1 tolerance).")
-    warning = total_warning(form.cleaned_data.get("printed_total"), total if rows else None)
+    amounts = [row.cleaned_data["line_total"] for row in items if row.cleaned_data and not row.cleaned_data.get("DELETE")]
+    warning = total_warning(form.cleaned_data.get("printed_total"), sum(amounts) if amounts else None)
     if warning:
         form.add_error("printed_total", warning)
 
@@ -108,8 +111,11 @@ def detail(request, pk):
             if submitting:
                 for name in ("po_date", "vendor", "printed_total"):
                     form.fields[name].required = True
-            if data is not None and form.is_valid() and items.is_valid() and submitting:
-                validate_submission(form, items)
+            if data is not None:
+                rows_valid = items.is_valid()
+                if submitting and rows_valid and form.is_valid():
+                    validate_submission(form, items)
+                validate_line_amounts(items)
             if data is not None and form.is_valid() and items.is_valid():
                 file = form.cleaned_data["pdf"]
                 if file:

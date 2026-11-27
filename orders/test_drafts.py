@@ -32,6 +32,26 @@ class PageInputs(HTMLParser):
 
 
 class ManualDraftTests(TestCase):
+    def test_save_draft_checks_each_line_before_writing(self):
+        page = reverse("draft-detail", args=[self.order.pk])
+        data = PageInputs(self.client.get(page)).values
+        data["items-TOTAL_FORMS"] = "2"
+        for index, amount in enumerate(("20.00", "21.01")):
+            for key, value in dict(sku=f"B-{index}", description="Bottle", quantity="2",
+                                   unit_price="10.00", line_total=amount).items():
+                data[f"items-{index}-{key}"] = value
+        response = self.client.post(page, data)
+        self.assertContains(response, "Quantity × unit price gives ₹20.00")
+        self.assertFalse(response.context["items"][0].errors)
+        self.assertIn("line_total", response.context["items"][1].errors)
+        self.assertEqual(PageInputs(response).values["items-1-line_total"], "21.01")
+        self.assertFalse(self.order.items.exists())
+        data["items-1-line_total"] = "21.00"
+        self.assertRedirects(self.client.post(page, data), page)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "DRAFT")
+        self.assertEqual(self.order.items.count(), 2)
+
     def test_sample_two_and_one_rupee_boundary(self):
         page = reverse("draft-detail", args=[self.order.pk])
         self.assertContains(self.client.get(page), "Line items not checked")
