@@ -1,8 +1,6 @@
 {% extends "orders/base.html" %}
+{% block title %}Approval queue{% endblock %}
 {% block content %}
-<p><a href="/">Purchase orders</a></p>
-<h1>Submitted purchase orders</h1>
-<ul>{% for order in orders %}
-  <li><a href="{% url 'draft-detail' order.pk %}">{{ order.number }}</a> · {{ order.vendor }}</li>
-{% empty %}<li>No orders awaiting a decision.</li>{% endfor %}</ul>
+<a class="back" href="/">← Purchase orders</a><h1>Approval queue</h1>
+<section class="panel"><h2>Submitted purchase orders</h2>{% include "orders/order_list.html" with empty_message="No orders awaiting a decision." %}</section>
 {% endblock %}

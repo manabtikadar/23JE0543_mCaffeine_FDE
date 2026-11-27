@@ -1,19 +1,22 @@
 {% extends "orders/base.html" %}
 {% load currency %}
 {% block content %}
-<p><a href="/">Purchase orders</a></p>
-<h1>{{ order.number|default:"Unnumbered draft" }}</h1>
-<p>Extraction method: {{ order.get_extraction_method_display }}</p>
+<a class="back" href="/">← Purchase orders</a>
+<div class="heading"><div><h1>{{ order.number|default:"Unnumbered draft" }}</h1>
+<p class="muted">Extraction method: {{ order.get_extraction_method_display }}</p></div>
+<span class="status {{ order.status }}">{{ order.get_status_display }}</span></div>
 {% if order.extraction_method == "unreadable" and not order.number %}
 <p role="status">This PDF can’t be read automatically. Enter the details by hand using the original below.</p>
 {% endif %}
-<p>{{ order.get_status_display }}</p>
 {% if total_warning %}<p class="errorlist" id="total-warning" role="alert">{{ total_warning }}</p>{% endif %}
 {% if not has_lines %}<p>Line items not checked</p>{% endif %}
-{% if order.pdf_key %}<p><a href="{% url 'original' order.pk %}" target="_blank" rel="noopener">Open original PDF</a></p>{% endif %}
+<div class="review{% if editable and order.pdf_key %} split{% endif %}">
+{% if order.pdf_key %}<aside class="panel preview"><a href="{% url 'original' order.pk %}" target="_blank" rel="noopener">Open original PDF ↗</a>
 {% if editable and order.pdf_key %}
 <iframe title="Original purchase order PDF" src="{% url 'original' order.pk %}" width="100%" height="420"></iframe>
 {% endif %}
+</aside>{% endif %}
+<section class="panel"><h2>Order details</h2>
 {% if editable %}
 {% if order.extraction_method != "unreadable" and order.pdf_key and not has_lines %}
 <form method="post" action="{% url 'read-original-items' order.pk %}">
@@ -23,8 +26,8 @@
 <form method="post" enctype="multipart/form-data">
   {% csrf_token %}
   {{ form.non_field_errors }}
-  {% for field in form %}{% if field.name != "pdf" or not order.pdf_key %}
-    <p>{{ field.label_tag }}
+  <div class="fields">{% for field in form %}{% if field.name != "pdf" or not order.pdf_key %}
+    <div>{{ field.label_tag }}
     {% if field.name == "po_date" %}
       <span class="po-date-field">{{ field }}<span class="po-date-picker" hidden>
         <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -33,16 +36,16 @@
         <input type="date" id="po-calendar" aria-label="Choose PO date from calendar" title="Choose PO date">
       </span></span>
     {% else %}{{ field }}{% endif %}
-    {{ field.errors }}</p>
-  {% endif %}{% endfor %}
+    {{ field.errors }}</div>
+  {% endif %}{% endfor %}</div>
   <h2>Line items</h2>
   {{ items.management_form }}{{ items.non_form_errors }}
   <div id="rows">{% for item in items %}<fieldset><legend>Line item {{ forloop.counter }}</legend>{{ item.as_p }}</fieldset>{% endfor %}</div>
   <template id="empty"><fieldset><legend>New line item</legend>{{ items.empty_form.as_p }}</fieldset></template>
-  <button type="button" id="add">Add line item</button>
-  <button type="submit">Save draft</button>
+  <button class="secondary" type="button" id="add">Add line item</button>
+  <div class="actions"><button class="secondary" type="submit">Save draft</button>
   <button type="submit" name="action" value="submit">{% if order.status == "REJECTED" %}Resubmit for approval{% else %}Submit for approval{% endif %}</button>
-</form>
+  </div></form>
 <script>
 const dateText = document.getElementById("id_po_date");
 const calendar = document.getElementById("po-calendar");
@@ -78,12 +81,12 @@ document.querySelector("#add").onclick = () => {
   <label for="remark">Remark (required for rejection)</label>
   <textarea name="remark" id="remark" required></textarea>
   <button formaction="{% url 'approve' order.pk %}" formnovalidate>Approve</button>
-  <button formaction="{% url 'reject' order.pk %}">Reject</button>
+  <button class="danger" formaction="{% url 'reject' order.pk %}">Reject</button>
 </form>
 {% endif %}
-<h2>Action history</h2>
-<ol>{% for entry in history %}
+</section></div><section class="panel"><h2>Action history</h2>
+<ol class="history">{% for entry in history %}
   <li>{{ entry.recorded_at|date:"Y-m-d H:i:s T" }} · {{ entry.actor.username }} · {{ entry.get_action_display }}{% if entry.remark %} — {{ entry.remark }}{% endif %}</li>
 {% empty %}<li>No actions recorded.</li>{% endfor %}</ol>
-{% if editable and order.status == "DRAFT" %}<p><a href="{% url 'delete-draft' order.pk %}">Delete draft</a></p>{% endif %}
+</section>{% if editable and order.status == "DRAFT" %}<p><a class="danger-link" href="{% url 'delete-draft' order.pk %}">Delete draft</a></p>{% endif %}
 {% endblock %}
