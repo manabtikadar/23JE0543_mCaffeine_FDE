@@ -79,6 +79,10 @@ legend { padding: 0 .35rem; color: var(--green); }
 .actions { display: flex; gap: .6rem; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 1rem; margin-top: 1.5rem; }
 .history { padding-left: 1.4rem; margin-bottom: 0; }
 .history li { padding: .32rem 0; }
+.decision-note { margin-bottom: 1.25rem; padding: 1rem 1.25rem; border-inline-start: .3rem solid #24583a; background: #e8f3e7; border-radius: .45rem; }
+.decision-note.REJECT { border-color: #913932; background: #faece8; }
+.decision-note h2, .decision-note p { margin-bottom: .4rem; }
+.remark { white-space: pre-wrap; overflow-wrap: anywhere; }
 .confirm { max-width: 42rem; margin: 1rem auto; }
 .confirm h1 { font-size: 2.3rem; }
 .login { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; max-width: 58rem; margin: 1rem auto; }

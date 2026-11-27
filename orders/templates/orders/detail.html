@@ -5,6 +5,13 @@
 <div class="heading"><div><h1>{{ order.number|default:"Unnumbered draft" }}</h1>
 <p class="muted">Extraction method: {{ order.get_extraction_method_display }}</p></div>
 <span class="status {{ order.status }}">{{ order.get_status_display }}</span></div>
+{% if decision.remark %}
+<section class="decision-note {{ decision.action }}" aria-labelledby="decision-title">
+  <h2 id="decision-title">{% if decision.action == "APPROVE" %}Approval remark{% elif order.status == "SUBMITTED" %}Previous rejection reason{% else %}Rejection reason{% endif %}</h2>
+  <p class="remark">{{ decision.remark }}</p>
+  <small>{{ decision.actor.username }} · {{ decision.recorded_at|date:"Y-m-d H:i:s T" }} · <a href="#action-history">View history</a></small>
+</section>
+{% endif %}
 {% if order.extraction_method == "unreadable" and not order.number %}
 <p role="status">This PDF can’t be read automatically. Enter the details by hand using the original below.</p>
 {% endif %}
@@ -84,9 +91,9 @@ document.querySelector("#add").onclick = () => {
   <button class="danger" formaction="{% url 'reject' order.pk %}">Reject</button>
 </form>
 {% endif %}
-</section></div><section class="panel"><h2>Action history</h2>
+</section></div><section class="panel" id="action-history"><h2>Action history</h2>
 <ol class="history">{% for entry in history %}
-  <li>{{ entry.recorded_at|date:"Y-m-d H:i:s T" }} · {{ entry.actor.username }} · {{ entry.get_action_display }}{% if entry.remark %} — {{ entry.remark }}{% endif %}</li>
+  <li>{{ entry.recorded_at|date:"Y-m-d H:i:s T" }} · {{ entry.actor.username }} · {{ entry.get_action_display }}{% if entry.remark %}<div class="remark">{{ entry.remark }}</div>{% endif %}</li>
 {% empty %}<li>No actions recorded.</li>{% endfor %}</ol>
 </section>{% if editable and order.status == "DRAFT" %}<div class="actions"><a class="button danger" href="{% url 'delete-draft' order.pk %}">Delete draft</a></div>{% endif %}
 {% endblock %}

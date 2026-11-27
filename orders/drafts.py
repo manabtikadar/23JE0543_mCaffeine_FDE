@@ -146,12 +146,15 @@ def detail(request, pk):
     if items.is_bound:
         has_lines = any(row.has_changed() or row.instance.pk for row in items
                         if not row.cleaned_data.get("DELETE")) if items.is_valid() else True
+    history = list(order.history.select_related("actor"))
+    decision = next((entry for entry in reversed(history)
+                     if entry.action in (HistoryEntry.Action.APPROVE, HistoryEntry.Action.REJECT)), None)
     return render(request, "orders/detail.html", {
         "order": order, "form": form, "items": items, "editable": editable,
         "has_lines": has_lines,
         "total_warning": warning,
         "can_decide": APPROVER in roles and request.user.pk != order.creator_id and order.status == PurchaseOrder.Status.SUBMITTED,
-        "history": order.history.select_related("actor"),
+        "history": history, "decision": decision,
     })
 
 
