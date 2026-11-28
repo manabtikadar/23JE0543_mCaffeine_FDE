@@ -4,25 +4,20 @@
 
 ## [OPEN LIVE APP](https://mcaffeine-po-23je0543.onrender.com/)
 
-[DEMO video](https://drive.google.com/file/d/1EDLMe3M1aJdPlEEl38MFUsC_XZDhw3Pm/view?usp=sharing) · [Login credentials](#login-credentials) · [Database health](https://mcaffeine-po-23je0543.onrender.com/health) · [Test PDFs](brief/) · [AI conversation](ai-session/conversation.md)
+[DEMO video](https://drive.google.com/file/d/1EDLMe3M1aJdPlEEl38MFUsC_XZDhw3Pm/view?usp=sharing) · [Database health](https://mcaffeine-po-23je0543.onrender.com/health) · [Test PDFs](brief/) · [AI conversation](ai-session/conversation.md)
 
 Operations uploads the supplier’s original, corrects the extracted figures and submits the PO. Finance can return it with a reason or approve it. The owner can reopen the original and history from the same PO after the decision.
 
-### Login credentials
+### Review walkthrough
 
-| Username | Demo password | Role | Try |
-|---|---|---|---|
-| creator1 | `E1nTKv1z22sX48AUX9xZ9Qcup+5O1sp/hA2yR8uIpe4=` | Creator | Upload and correct a PO |
-| creator2 | `poWWwFOAZ+YSvqLIlxPgyuZicQGi3zR/xCIfF3Q/KLI=` | Creator | Upload a duplicate of creator1’s PO |
-| approver1 | `qh+wj45LrDvhzHuMfC5Xa+eAZ9pJggmgIj+xqL2tgnM=` | Approver | Reject, then approve the corrected PO |
-| lead1 | `3GPgsiBM4Wqxc1xdpIBfQdOlClSz0YxOuFVvhpt0+7U=` | Creator + Approver | Submit a PO and verify self-approval returns 403 |
+The four test logins are in `Submission_Links.pdf` at the top level of the submitted ZIP. Use sample orders on the public demo.
 
-Use these accounts to test the public demo with sample purchase orders.
+1. Open the live app in a private window. Sign in as the first creator. Download [review-po.pdf](brief/review-po.pdf), choose it and click **Upload and review**. Expect `PO-REVIEW-0543`, one amber-bottle row and ₹60.00. If that number is already in use, create a manual draft with a fresh number, attach the PDF, and enter 28-11-2026, Review Packaging, three bottles at ₹20 each and ₹60 for both totals.
+2. **Submit** and note the PO page URL. As the approver, open the submitted queue, select that number, enter “Specify bottle material” and **Reject**.
+3. As the first creator, reopen the same PO, change the description to “Amber glass bottle” and submit again. As the approver, open it from the queue and **Approve**.
+4. As the first creator, reopen the saved URL. Check the corrected row, final **Approved** status and four history entries in order: Submitted, Rejected, Resubmitted, Approved. Check the actors, times and rejection reason. **Open original PDF** should still show the original wording. The automated workflow test repeats the approval POST as finance and checks for HTTP 409 and exactly four entries.
 
-1. Open the live app in a private window. Sign in as **creator1**. Download [review-po.pdf](brief/review-po.pdf), choose it and click **Upload and review**. Expect `PO-REVIEW-0543`, one amber-bottle row and ₹60.00. If that number is already in use, create a manual draft with a fresh number, attach the PDF, and enter 28-11-2026, Review Packaging, three bottles at ₹20 each and ₹60 for both totals.
-2. **Submit** and note the PO page URL. As **approver1**, open the submitted queue, select that number, enter “Specify bottle material” and **Reject**.
-3. As **creator1**, reopen the same PO, change the description to “Amber glass bottle” and submit again. As **approver1**, open it from the queue and **Approve**.
-4. As **creator1**, reopen the saved URL. Check the corrected row, final **Approved** status and four history entries in order: Submitted, Rejected, Resubmitted, Approved. Check the actors, times and rejection reason. **Open original PDF** should still show the original wording. The automated workflow test repeats the approval POST as finance and checks for HTTP 409 and exactly four entries.
+[Architecture diagram (PNG)](public/flow-diagram.png)
 
 ### Architecture and upload journey
 
@@ -38,7 +33,7 @@ flowchart LR
 
 **Upload and review** sends one PDF (up to 5 MB) with the session and CSRF token. Django checks the Creator role and reads the text with pdfplumber. Inside a transaction it creates the draft and editable rows, verifies the bucket is private, uploads the original under a generated key and commits. A normalized PO-number constraint catches duplicates across creators before the file is stored. The browser follows a redirect to the detail page. The preview requests the PDF through Django, which checks access before fetching the stored bytes.
 
-Django’s server-rendered templates handle the UI. Sessions and Argon2 password hashes live in PostgreSQL alongside orders, integer-paise amounts and append-only history. The service uses UTC for audit times. **/health** checks the database and returns 503 on failure. PDF storage has a separate failure path.
+The project started from a repository containing only a title. Django’s server-rendered templates handle the UI. Sessions and Argon2 password hashes live in PostgreSQL alongside orders, integer-paise amounts and append-only history. The service uses UTC for audit times. **/health** checks the database and returns 503 on failure. PDF storage has a separate failure path.
 
 ### PDF coverage and checks
 
@@ -46,7 +41,7 @@ Django’s server-rendered templates handle the UI. Sessions and Argon2 password
 |---|---|
 | Sample 1 · digital | Five editable rows, ₹2,54,200.00. MC-027’s wrapped description ends in “Arabica Extract and Walnut Shell 250g”. |
 | Sample 2 · mismatch | Three lines total ₹1,24,500.00 against ₹1,42,500.00 printed. Review shows the ₹18,000 difference. Submission keeps the PO in Draft. |
-| Sample 3 · resent | Upload after sample 1 as **creator2**. The duplicate-number message reveals no owner or PO contents. |
+| Sample 3 · resent | Upload after sample 1 as the second creator. The duplicate-number message reveals no owner or PO contents. |
 | Sample 4 · garbled | Manual-entry message, blank header and rows, readable original alongside. |
 | Review PO · custom | One row, quantity 3 × ₹20.00. Use for the approval walkthrough above. |
 
@@ -80,4 +75,4 @@ python manage.py runserver
 
 Open http://127.0.0.1:8000/. Provisioning sets passwords when accounts are first created. Tests use a separate test database and mock object storage. [Render deployment configuration](render.yaml) installs dependencies, applies migrations, provisions accounts and starts Gunicorn on the assigned port.
 
-**Release checks, 28 November 2026.** All 21 local tests passed with the five PDFs present. In a fresh Edge InPrivate profile, the public raw README led to the Render sign-in form and a healthy database response. An anonymous live API request returned 401. The authenticated walkthrough and retrieval from live Storage still require the current demo passwords.
+**Release checks, 28 November 2026.** All 21 local tests passed with the five PDFs present. In a fresh Edge InPrivate profile, the public raw README led to the Render sign-in form and a healthy database response. An anonymous live API request returned 401. All four evaluator accounts signed in successfully on the live site. The full approval cycle and original-file retrieval were tested locally.

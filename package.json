@@ -1,0 +1,9 @@
+{
+  "name": "mcaffeine-fde",
+  "private": true,
+  "description": "Optional command shortcuts for the Django project",
+  "scripts": {
+    "start": "python manage.py runserver",
+    "test": "python manage.py test config orders"
+  }
+}
